@@ -1,3 +1,9 @@
+"""
+CLI module - legacy argparse implementation (no longer used)
+The actual CLI is now implemented using Click in main.py
+Entry point is handled by src/entry_point.py
+"""
+
 import argparse
 from pathlib import Path
 

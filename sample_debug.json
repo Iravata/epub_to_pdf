@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "title": "Sample Book",
+    "author": "John Doe",
+    "language": "en",
+    "publisher": null,
+    "publication_date": null,
+    "isbn": null,
+    "description": null,
+    "genres": null,
+    "rights": null
+  },
+  "chapters": [],
+  "structure": {
+    "type": "book",
+    "children": []
+  },
+  "toc": [],
+  "images": [],
+  "styles": []
+}

@@ -1,66 +1,83 @@
 #!/usr/bin/env python3
 """
-EPUB to PDF Converter - Phase 2 Entry Point
+EPUB to PDF Converter - Phase 3
+Now with actual PDF generation!
 """
 
 import sys
-import json
 from pathlib import Path
 import click
 from src.converter import EPUBProcessor
+from src.pdf_generator import PDFGenerator
 
 @click.command()
-@click.argument('input_file', type=click.Path(exists=True, path_type=Path))
-@click.option('--debug', is_flag=True, help='Show detailed processing information')
-def main(input_file, debug):
-    """Process EPUB file and display information."""
+@click.argument('input_file', type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    '--output', '-o',
+    type=click.Path(dir_okay=False),
+    help='Output PDF file path (auto-generated if not specified)'
+)
+@click.option(
+    '--page-size',
+    type=click.Choice(['letter', 'A4', 'A5']),
+    default='letter',
+    help='PDF page size'
+)
+@click.option(
+    '--debug',
+    is_flag=True,
+    help='Show detailed processing information'
+)
+def main(input_file, output, page_size, debug):
+    """Convert EPUB files to PDF format with basic formatting."""
+    
+    # Determine output path
+    if output:
+        output_path = output
+    else:
+        # Auto-generate output filename
+        input_path = Path(input_file)
+        output_path = input_path.with_suffix('.pdf')
+    
     try:
-        # Process EPUB
-        processor = EPUBProcessor(str(input_file))
-        result = processor.process()
+        click.echo(f"📖 Processing EPUB: {input_file}")
         
-        # Display results
-        metadata = result['metadata']
-        click.echo("\n📚 EPUB Information")
-        click.echo("=" * 50)
-        click.echo(f"Title: {metadata.get('title', 'Unknown')}")
-        click.echo(f"Author: {metadata.get('author', 'Unknown')}")
-        click.echo(f"Language: {metadata.get('language', 'Unknown')}")
+        # Process EPUB (Phase 2)
+        processor = EPUBProcessor(input_file)
+        epub_data = processor.process()
         
-        if metadata.get('publisher'):
-            click.echo(f"Publisher: {metadata['publisher']}")
+        click.echo("✅ EPUB processed successfully")
+        click.echo(f"  • Chapters: {len(epub_data['chapters'])}")
+        click.echo(f"  • Images: {len(epub_data['images'])}")
         
-        click.echo("\n📖 Content Structure")
-        click.echo("=" * 50)
-        click.echo(f"Chapters: {len(result['chapters'])}")
-        click.echo(f"Images: {len(result['images'])}")
-        click.echo(f"Stylesheets: {len(result['styles'])}")
+        # Generate PDF (Phase 3)
+        click.echo(f"\n📄 Generating PDF: {output_path}")
         
-        click.echo("\n📑 Table of Contents")
-        click.echo("=" * 50)
-        for item in result['toc'][:5]:  # Show first 5 items
-            indent = "  " * item.get('level', 0)
-            click.echo(f"{indent}• {item['title']}")
+        # Show progress bar for PDF generation
+        generator = PDFGenerator(str(output_path), page_size)
         
-        if len(result['toc']) > 5:
-            click.echo(f"  ... and {len(result['toc']) - 5} more")
+        with click.progressbar(epub_data['chapters'], label='Converting chapters') as chapters:
+            # Set metadata first
+            generator._add_metadata(epub_data['metadata'])
+            
+            # Cache images
+            generator._cache_images(epub_data.get('images', []))
+            
+            # Process chapters with progress
+            for i, chapter in enumerate(chapters):
+                if i > 0:
+                    generator.pdf_creator.add_page()
+                generator._process_chapter(chapter)
         
-        if debug:
-            # Save full structure for debugging
-            debug_file = input_file.stem + '_debug.json'
-            with open(debug_file, 'w') as f:
-                # Convert bytes to strings for JSON serialization
-                debug_data = result.copy()
-                debug_data['images'] = [
-                    {k: v if k != 'data' else '<binary>' 
-                     for k, v in img.items()}
-                    for img in debug_data['images']
-                ]
-                json.dump(debug_data, f, indent=2, default=str)
-            click.echo(f"\n💾 Debug data saved to: {debug_file}")
+        # Save PDF
+        generator.pdf_creator.save()
+        
+        click.echo("✅ PDF generated successfully!")
+        click.echo(f"  • Output: {output_path}")
+        click.echo(f"  • Size: {Path(output_path).stat().st_size / 1024:.1f} KB")
         
     except Exception as e:
-        click.echo(f"Error processing EPUB: {e}", err=True)
+        click.echo(f"Error: {e}", err=True)
         if debug:
             import traceback
             traceback.print_exc()

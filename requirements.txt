@@ -1,5 +1,8 @@
 ebooklib==0.18
-pathlib2==2.3.7
 beautifulsoup4==4.12.2
-lxml==4.9.3
+reportlab==4.0.7
+Pillow==10.1.0
+PyPDF2==3.0.1
+pathlib2==2.3.7
 click==8.1.7
+lxml==4.9.3
