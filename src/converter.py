@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Dict, Any
 
-from .epub_validator import EPUBValidator
+from .validator import InputValidator
 from .metadata_parser import MetadataParser
 from .content_organizer import ContentOrganizer
 from .navigation_parser import NavigationParser
@@ -16,9 +16,10 @@ class EPUBProcessor:
         self.epub_path = epub_path
         
         # Validate first
-        validator = EPUBValidator(epub_path)
-        if not validator.is_valid():
-            raise ValueError(f"Invalid EPUB: {validator.get_error()}")
+        validator = InputValidator()
+        is_valid, error_msg = validator.validate_epub(epub_path)
+        if not is_valid:
+            raise ValueError(f"Invalid EPUB: {error_msg}")
         
         # Initialize components (DRY: single initialization)
         self.metadata_parser = MetadataParser(epub_path)

@@ -5,4 +5,6 @@ Pillow==10.1.0
 PyPDF2==3.0.1
 pathlib2==2.3.7
 click==8.1.7
+psutil==5.9.6
 lxml==4.9.3
+cssutils==2.11.1

@@ -69,12 +69,22 @@ class PDFGenerator:
     
     def _process_chapter(self, chapter: Dict[str, Any]):
         """Process individual chapter"""
-        # Add chapter title if present
-        if chapter.get('title'):
-            self.pdf_creator.add_heading(chapter['title'], level=1)
-        
-        # Convert HTML content to PDF elements
+        # Convert HTML content to PDF elements first to check for headings
         elements = self.html_converter.convert(chapter['content'])
+        
+        # Check if the first element is already a heading that matches the chapter title
+        chapter_title = chapter.get('title', '').strip()
+        has_matching_heading = False
+        
+        if elements and chapter_title:
+            first_element = elements[0]
+            if (first_element.get('type') == 'heading' and 
+                first_element.get('text', '').strip().lower() == chapter_title.lower()):
+                has_matching_heading = True
+        
+        # Only add chapter title if it's not already present in the content
+        if chapter_title and not has_matching_heading:
+            self.pdf_creator.add_heading(chapter_title, level=1)
         
         # Add elements to PDF
         for element in elements:
@@ -97,14 +107,19 @@ class PDFGenerator:
         elif elem_type == 'break':
             self.pdf_creator.add_spacer(0.1)
         elif elem_type == 'text':
-            self.pdf_creator.add_text(element['text'])
+            self.pdf_creator.add_text(element['text'], 'Normal')
+        elif elem_type == 'code':
+            self._add_code(element)
+        elif elem_type == 'table':
+            self._add_table(element)
     
     def _add_paragraph(self, element: Dict[str, Any]):
         """Add paragraph to PDF"""
         text = element.get('text', '')
         if text:
-            # KISS: Use default style for now
-            self.pdf_creator.add_text(text, 'Normal')
+            # Use justified alignment for better readability
+            style = 'Justified' if 'Justified' in self.pdf_creator.styles else 'Normal'
+            self.pdf_creator.add_text(text, style)
             self.pdf_creator.add_spacer(0.1)
     
     def _add_heading(self, element: Dict[str, Any]):
@@ -132,21 +147,55 @@ class PDFGenerator:
     def _add_image(self, element: Dict[str, Any]):
         """Add image to PDF"""
         src = element.get('src', '')
+        if not src:
+            return
         
-        # Look for image in cache
+        # Normalize the src path - remove relative path components
+        normalized_src = src.replace('../../', '').replace('../', '').replace('./', '')
+        
+        # Look for image in cache with improved matching
         for name, img_data in self.image_cache.items():
-            if src in name or name in src:
-                self.pdf_creator.add_image(
-                    img_data['data'],
-                    width=img_data['width'] * 0.75  # Scale to fit
-                )
-                self.pdf_creator.add_spacer(0.2)
-                break
+            # Normalize the cached name too
+            normalized_name = name.replace('../../', '').replace('../', '').replace('./', '')
+            
+            # Try multiple matching strategies
+            if (normalized_src == normalized_name or 
+                normalized_src in normalized_name or 
+                normalized_name in normalized_src or
+                normalized_src.split('/')[-1] == normalized_name.split('/')[-1]):  # Match just filename
+                
+                try:
+                    self.pdf_creator.add_image(
+                        img_data['data'],
+                        width=img_data['width'] * 0.75  # Scale to fit
+                    )
+                    self.pdf_creator.add_spacer(0.2)
+                    break
+                except Exception as e:
+                    # Silently skip failed images
+                    continue
     
     def _add_blockquote(self, element: Dict[str, Any]):
         """Add blockquote to PDF"""
         text = element.get('text', '')
         if text:
-            # KISS: Use italic style for blockquotes
-            self.pdf_creator.add_text(f'"{text}"', 'Italic')
+            # Use custom blockquote style if available
+            style = 'Blockquote' if 'Blockquote' in self.pdf_creator.styles else 'Italic'
+            self.pdf_creator.add_text(text, style)
+    
+    def _add_code(self, element: Dict[str, Any]):
+        """Add code block to PDF"""
+        text = element.get('text', '')
+        if text:
+            # Use the new code formatting method
+            preserve_whitespace = element.get('preserve_whitespace', True)
+            self.pdf_creator.add_code(text, preserve_whitespace)
+            self.pdf_creator.add_spacer(0.1)
+    
+    def _add_table(self, element: Dict[str, Any]):
+        """Add table to PDF"""
+        text = element.get('text', '')
+        if text:
+            # Simple table representation as formatted text
+            self.pdf_creator.add_text(text, 'Normal')
             self.pdf_creator.add_spacer(0.15)
